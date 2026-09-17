@@ -52,64 +52,38 @@ toc::[]
 [discrete]
 === glTF Background
 
-These are notes from my working through the glTF specification.
+_The JPEG of 3D_
 
-Here is what I want Claude Code to do:
-* I've noted questions I have with "Q: ".   Take a cut at answering the question and add the answer below the quesiton with "A (CC): " prepended.
+These are notes from my working through the glTF specification.
 
 [discrete]
 ==== References
 
 This section is a running history of the references I've reviewed as part of these notes.
 
-[discrete]
-===== Khronos.org
-
-* Develops and maintains open standards for "connectinog silicon to software" - low-level APIs and file formats.
-* 150 members
-* They maintain many of the specifications, including https://www.khronos.org/opengl/[OpenGL] and https://www.khronos.org/collada/[Collada]
-
-[discrete]
-===== https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html[glTF 2.0 Specification]
-
-_The JPEG of 3D_
-
-[discrete]
-====== https://github.com/KhronosGroup/glTF-Tutorials
-
-[discrete]
-====== https://github.com/KhronosGroup/glTF/blob/main/specification/2.0/figures/gltfOverview-2.0.0d.png[glTF Quickstart]
-
-[discrete]
-===== https://www.youtube.com/watch?v=HLIHnG_cYkk[Video: Discussing Vulkan, Neural Rendering, SLANG, AI & More - Neil Trevett & Khronos Group Interview]
-
-* Neil Trevett: VP Developer Ecosystems, NVIDIA; President, Kronos Group
-
-* Programming and using GPUs:
-** Vulkan: New generation GPU API, used for AI/ML acceleration
+* Khronos.org
+** Develops and maintains open standards for "connectinog silicon to software" - low-level APIs and file formats.
+** 150 members
+** They maintain many of the specifications, including https://www.khronos.org/opengl/[OpenGL] and https://www.khronos.org/collada/[Collada]
+* https://github.com/KhronosGroup/glTF-Tutorials
+* https://www.youtube.com/watch?v=HLIHnG_cYkk[Video: Discussing Vulkan, Neural Rendering, SLANG, AI & More - Neil Trevett & Khronos Group Interview]
+** Neil Trevett: VP Developer Ecosystems, NVIDIA; President, Kronos Group
+** Programming and using GPUs:
+*** Vulkan: New generation GPU API, used for AI/ML acceleration
 +
 *Q:* How does Vulcan compare/contrast with CUDA?
 +
 *A (CC):* They overlap only in GPU compute, and are not competitors elsewhere. Vulkan is Khronos's cross-vendor graphics _and_ compute API - AMD, Intel, NVIDIA, Qualcomm, Apple via MoltenVK - and is deliberately explicit: you manage memory, synchronization and command buffers yourself, which is the price of portability. Shaders compile to SPIR-V, which is why SPIR-V and Slang appear alongside it in the interview. CUDA is NVIDIA-only and is a C++ single-source model, host and device code in one file, pitched much higher; its real moat is the library stack above it (cuBLAS, cuDNN, TensorRT), not the language. So: training and HPC go to CUDA on ecosystem grounds; compute that must run on any GPU goes to Vulkan. CUDA does no rasterization or presentation at all, so for putting pixels on screen they are not alternatives. Relevance to this project is close to zero - our stack is Ogre-Next under gz-rendering, and CI runs headless on Mesa with EGL.
-** SPIR-V: Intermediate representation for compilers.
-** Slang: Language (and compiler) - new generation shading language. Replaced glsl.
-
-glTF
-* Evolving, started as a display format (how to display ) and evolving to scene understanding
-* Just added Gaussian Splats
-
-[discrete]
-===== https://github.com/kcoley/glTF[glTF 2.0 Quickstart and tools]
-
-* Mine this for useful stuff, but the parent repo is likely stale
-* Lots of resources here.  Just links in the README. Some of the reference may be old.  For example, the "Sample Model" link points to a
-
-Reading
-
-[discrete]
-===== https://github.com/openrobotics/reps/blob/main/_posts/rep-0158%3A2006.md[OpenUSD Conventions for Simulation Asset Interoperability in Open Source Robotics]
-
-* Maybe we don't need glTF at all?
+*** SPIR-V: Intermediate representation for compilers.
+*** Slang: Language (and compiler) - new generation shading language. Replaced glsl.
+** glTF
+*** Evolving, started as a display format (how to display ) and evolving to scene understanding
+*** Just added Gaussian Splats
+* https://github.com/kcoley/glTF[glTF 2.0 Quickstart and tools]
+** Mine this for useful stuff, but the parent repo is likely stale
+** Lots of resources here.  Just links in the README. Some of the reference may be old.  For example, the "Sample Model" link points to a
+* https://github.com/openrobotics/reps/blob/main/_posts/rep-0158%3A2006.md[OpenUSD Conventions for Simulation Asset Interoperability in Open Source Robotics]
+** Maybe we don't need glTF at all?
 
 *A (CC):* Having read it: REP-0158 is not an argument against glTF, it is an argument for authoring so that glTF export works. It mandates `UsdPreviewSurface` as the normative surface definition _"to ensure a direct mapping to glTF 2.0's pbrMetallicRoughness workflow"_, forbids UDIMs because glTF cannot express them, and requires CCW winding to match glTF's front-face rule. glTF 2.0 is its export target, named throughout.
 
@@ -121,7 +95,9 @@ Three things in it we should act on regardless of whether we ever touch USD:
 
 . _It is an external authority for decision 4._ _"Lossless PNG"_ is mandated for normal, metallic, roughness and packed ORM maps; JPEG is permitted only for color maps without alpha. We had concluded the budget row had no authority outside this project. On texture format, it now has one, and it agrees with the analysis above.
 . _It supports our +X forward decision._ It requires ROS convention throughout - X forward, Y left, Z up - for exactly the reason we did: the frame is the interface. Note its Z-up applies to the USD _stage_, not to a glTF file, so there is no conflict with our Y-up rule; they are different layers.
-. _Several of its rules are already ours_: unique UVs packed into [0,1], triangulated geometry, no HDR texture formats.
+. _Several of its rules are already ours_: unique UVs packed into [0,1], and no HDR texture formats for material maps. Its triangulation rule does not transfer - REP-0158 states it about _collision_ meshes, which `model-spec.md` puts out of scope.
+
+All three are now written into `model-spec.md`: the reference itself in section 1.2, the forward-axis support in 5.3, the UV range and uniqueness in 6.1, and the per-map texture format in 8. Each cites REP-0158 and leaves the justification there.
 
 Where it genuinely bears on us is the question we parked - delivering a robot as one assembled asset. It is explicit that this is a composition problem: `kind="component"` for a distributable part, `kind="assembly"` for an aggregate, composed by References and Payloads, with `physics.usda` and `ros.usda` as separate layers. That is a serious answer to a problem we have not yet framed, and it is worth reading against that open question rather than against the choice of `.glb`.
 
@@ -139,6 +115,16 @@ Are there others with the same challenges (glTF interpretation/narrowing and wor
 ====== Gazebo community and developers
 
 *Q:* Gazebo is usually good about roadmaps.  To they have a roadmap that includes some details of glTF support - or any discussions online, or evidence in the code?
+
+*A (CC):* No roadmap item. There is a published roadmap and glTF is not on it; the direction lives in the PMC minutes instead.
+
+* _Roadmap, checked._ The https://gazebosim.org/docs/latest/roadmap/[Gazebo M roadmap] (target 2027-03-23) lists fifteen items - Zenoh, MuJoCo physics, "Improve rendering quality" - and not one mentions glTF, GLB, PBR or mesh formats. glTF appears on the https://gazebosim.org/docs/all/release-features/[release features] page only as shipped history, under Garden: "glTF and GLB mesh support".
+* _Intent, on the record._ The https://discourse.openrobotics.org/t/gazebo-pmc-meeting-minutes-2026-08-17/57494[PMC minutes of 2026-08-17] record a discussion of "long-term deprecation of COLLADA (DAE) format support in favor of modern standards like glTF/GLB", the reason being that major tools such as Blender have dropped COLLADA. No schedule: a transition strategy and a Fuel compatibility check come first, and the discussion moved to Zulip.
+* _A decision already taken._ The https://discourse.openrobotics.org/t/gazebo-pmc-meeting-minutes-2026-06-15/55498[PMC minutes of 2026-06-15] agreed to move from the custom Collada, OBJ and STL loaders to Assimp by default, keeping the custom ones behind an environment variable for one release and then removing them.
+* _Code today._ `MeshManager.cc` routes `gltf`, `glb` and `fbx` to `AssimpLoader` while `dae`, `obj` and `stl` still use their custom loaders, so that decision has not landed yet. `GZ_MESH_FORCE_ASSIMP=true` forces everything through assimp.
+* _Nothing written down._ The only official statement of glTF scope is a sentence in the `MeshManager` API reference. A maintainer conceded in https://discourse.openrobotics.org/t/improving-asset-import-workflow-for-external-models-with-textures-fbx-gltf-glb-usdz-etc/54622[the asset-import thread] that the supported-format list is "hardly discoverable" and the documentation is "lacking"; https://github.com/gazebosim/docs/issues/308[docs#308] has been open since 2022, as has https://github.com/gazebosim/gz-common/issues/374[gz-common#374], the GSoC-22 mesh-format meta-ticket.
+
+So: the direction of travel favours glTF, but nothing is scheduled and nothing is promised. `model-spec.md` should cite the 2026-08-17 minutes as intent and `MeshManager.cc` as behavior, and should not claim roadmap support.
 
 [discrete]
 ====== Examples
