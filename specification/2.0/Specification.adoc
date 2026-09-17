@@ -911,9 +911,13 @@ For property names, glTF usually uses camel case, `likeThis`.
 
 [[honu-coordinate-system]]
 [sidebar]
-.HONU reading note — Coordinate system
+.HONU reading note — Coordinate system: what this section fixes, and what nothing can
 ****
-3.4. Coordinate System and Units - This is a big one for later.
+*Note:* This paragraph is stated as definitions, with no requirement keyword anywhere in it. That does not make its four sentences equal. The up axis is acted on by every exporter (Blender rewrites `(x, y, z)` to `(x, z, -y)` when its `+Y Up` box is checked) and by every viewer, and by RViz, which rotates a glTF mesh +90° about X on load. The front sentence is acted on by nobody, because a file has no property that records a front: no exporter writes one, no consumer reads one, no validator can check one. So "+Y up" is a convention with teeth and "+Z front" is a convention only people can enforce.
+
+For our pipeline the consequences, verified against gz-common 7.3.0 and rviz_rendering 15.2.5 with hand-authored probe files: Gazebo performs no up-axis conversion at all and puts the file's axes straight onto the link's axes; RViz applies the +90° roll itself; the correction for Gazebo therefore lives in the SDF visual pose, and it cannot be the same value for both consumers. A part modeled x forward, y left, z up in Blender and exported with the default settings arrives with forward on +X, up on +Y and its right-hand side on +Z, which meets the up-axis sentence and not the front sentence. Whether to change that is review decision 2 in `bluerobotics_models`.
+
+The derivation, the loader source, the probe assets and a tutorial are in `tools/maritime-workspace/notes/glTF_Gazebo_ROS_Coordinates.md`.
 ****
 
 
@@ -1071,6 +1075,15 @@ In the following example, the node named `Car` has four children each of which h
 
 [[transformations]]
 === Transformations
+
+[[honu-node-transforms]]
+[sidebar]
+.HONU reading note — Node transforms are the only transforms, and our consumers honor them
+****
+*Note:* Read with 3.4. Only a node carries a transform; a mesh and a primitive have none, so a multi-material part split into several primitives cannot fragment its frame, and the composition rule below guarantees every vertex in a file lands in one shared space. What the format does not provide is any statement about where that space's zero sits relative to the geometry, or which way the geometry faces. The origin is wherever the numbers evaluate to zero. Both of those are ours to state outside the file, and no tool can check them.
+
+Both of our consumers compose node transforms up the tree and bake the product into the vertices, so a `translation` or `rotation` on a node is faithfully applied. Verified by probe: a child node translated (0, 0.5, 0) and rotated 90° about Y arrives exactly there, as a submesh named after the node. One exception matters for the narrowing spec: gz-common 7.3.0 compares a lowercased extension against the literal `"glTF"`, so a `.gltf` file loses its root node's rotation while a `.glb` keeps it. Together with REP 158's rule that assets must not rely on root-node rotations to align geometry, that is why the narrowing spec forbids a `rotation` or `matrix` on the root node and requires transforms to be applied in Blender before export.
+****
 
 By default, a node's local space transform is identity.
 
