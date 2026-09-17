@@ -129,7 +129,7 @@ So: the direction of travel favours glTF, but nothing is scheduled and nothing i
 [discrete]
 ====== Examples
 
-Can we identify
+Can we identify examples of glTF usage in the Gazebo community that would inform, bottom-up, what folks are using as best practices?
 
 [discrete]
 ====== Fuel
@@ -589,6 +589,28 @@ Binary and image resources **MAY** also be embedded directly in JSON using <<dat
 A valid glTF asset **MUST** specify its version.
 
 
+[[honu-gltf-vs-glb]]
+[sidebar]
+.HONU reading note — `.gltf` with side files, or `.glb`
+****
+*Q:* Three is a decision here for model-spec.md.   Should we use .gltf or .glb.   I'm leaning toward disaggregated assets (.gltf with separate .bin and image files) for better modularity and easier editing - and less friction with git.  Also allows for quickly indtifying the different parts of the model, their size and format.   Would probably need a file naming convention if using .gltf.  I believe there are no performance issues to consider - but should check.
+
+*A (CC):* The modularity case is real, but on this stack three things weigh against it, and one of them contradicts the performance assumption.
+
+* _A silent orientation bug, today._ The installed gz-common 7.3.0 computes `useIdentityRotation = (extension != "glb" && extension != "glTF")` after lowercasing the extension, so `"glTF"` never matches and a `.gltf` file loses its root rotation. `.glb` matches and keeps it. Fixed upstream by gz-common PR 858, absent from the version in the container. A `.gltf` delivery would come in mis-rotated with no error.
+* _There is a performance issue._ Gazebo decodes external textures eagerly when the mesh loads, which is an open upstream problem. Embedded images go through the same decode but there is no separate resolve-and-read per file.
+* _A delivery gains a way to arrive incomplete._ One artifact cannot lose its textures in transit; a directory of six files can. The acceptance tooling currently reads a delivery with no search path at all.
+
+Against that, the git argument is the strong one: textures are 59% of every byte we store, so re-exporting geometry to change one map is waste, and a diff that names the changed map is worth having.
+
+What the community does, from the Fuel survey: 53 GLB against one `.gltf` plus `.bin`, and the single non-GLB model is the broken one.
+
+My read: keep `.glb` while the rotation bug is in the installed version. The inspectability you want is already covered without changing the format - `glb_inventory.py` reports per-image size, format and texel density out of the container. Revisit when gz-common carries PR 858 and the eager-decode fix.
+
+*Decided.* `.glb` required and `.gltf` prohibited, written into `model-spec.md` section 4.2 with the rotation bug as the reason and the `.gltf` advantages stated so a reader knows what is being given up. Note the two questions turned out to be separable after all: a GLB packs only the first buffer into its binary chunk, and `image.uri` may still point at an external file, so decision 16 stays open.
+****
+
+
 [[versioning]]
 == Versioning
 
@@ -776,6 +798,16 @@ Suggested rule: `asset.version` MUST be `"2.0"`; `asset.minVersion` MUST be abse
 
 Each glTF asset **MUST** have an `asset` property.
 
+[[honu-asset-object]]
+[sidebar]
+.HONU reading note — Is a glTF asset one-to-one with its `asset` object
+****
+*Q:* Is glTF and asset one-to-one?  Can a glTF asset contain multiple `asset` objects?
+
+*A (CC):* One-to-one, and the word is overloaded. "glTF asset" means the whole deliverable - the JSON plus whatever buffers and images it references. `asset` is a single object inside it holding that deliverable's metadata: `version`, and optionally `generator`, `copyright` and `minVersion`. The root schema lists `asset` as an object property and as the only entry in `required`, so every file has exactly one and cannot have two.
+****
+
+
 The `asset` object **MUST** contain a `version` property that specifies the target glTF version of the asset. Additionally, an optional `minVersion` property **MAY** be used to specify the minimum glTF version support required to load the asset.
 
 Both `version` and `minVersion` properties **MUST** conform to the asset version string syntax defined as follows.
@@ -913,6 +945,20 @@ Chromaticity coordinates define the interpretation of each primary color channel
 === Overview
 
 glTF 2.0 assets **MAY** contain zero or more _scenes_, the set of visual objects to render. Scenes are defined in a `scenes` array. All nodes listed in `scene.nodes` array **MUST** be root nodes, i.e., they **MUST NOT** be listed in a `node.children` array of any node. The same root node **MAY** appear in multiple scenes.
+
+[[honu-scenes-cardinality]]
+[sidebar]
+.HONU reading note — Use cases for zero, one and multiple scenes
+****
+*Q:* Curious, what would be use cases for zero, one and multiple scenes?  Any of those use cases relevant for us?
+
+*A (CC):* The three cases, and only the middle one is ours.
+
+* _Zero scenes._ A library: materials, meshes or nodes meant to be pulled out by something other than a viewer. Nothing renders on open. See the note at <<honu-scene-or-library>> for what this would cost us.
+* _One scene._ The renderable asset, and what every consumer assumes. Fourteen of our fifteen files are one scene, one node, one mesh.
+* _Multiple scenes._ Alternative arrangements of the same content in one file - a room laid out several ways, an exporter writing one scene per collection - with the root `scene` index naming which to show first. Note the spec permits the same root node in several scenes, so they share content rather than duplicating it.
+****
+
 
 An additional root-level property, `scene` (note singular), identifies which of the scenes in the array **SHOULD** be displayed at load time. When `scene` is undefined, client implementations **MAY** delay rendering until a particular scene is requested.
 
