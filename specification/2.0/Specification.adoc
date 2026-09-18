@@ -129,74 +129,12 @@ So: the direction of travel favours glTF, but nothing is scheduled and nothing i
 [discrete]
 ====== Examples
 
-Can we identify examples of glTF usage in the Gazebo community that would inform, bottom-up, what folks are using as best practices?
+*Q:* Can we identify examples of glTF usage in the Gazebo community that would inform, bottom-up, what folks are using as best practices?
 
-[discrete]
-====== Fuel
+*A (CC):* Yes, and the answer outgrew this note. The bottom-up survey now lives in `maritime-workspace/gltf-assess/`, where it is re-run rather than rewritten: `criteria.md` states what is assessed and why, `examples.yaml` is the list of assets, `gltf_assess.py` measures them over HTTP range requests without downloading them whole, and `ASSESSMENT.md` and `findings.md` are what comes out. The Fuel survey of 2026-09-12 that used to sit here is the opening section of `findings.md`.
 
-*A (CC):* Surveyed the whole library on 2026-09-12 through the Fuel REST API rather than the web UI, because neither mesh format nor articulation is a searchable field there. `GET /1.0/models?per_page=100` walks all 3,371 records; `/1.0/{owner}/models/{name}/tip/files` gives each model's file tree; `/tip/files/model.sdf` gives the SDF. For the glTF assets themselves, an HTTP Range request for the first twenty bytes of a `.glb` yields the JSON chunk length, and a second range request yields the chunk - so every glTF file in Fuel can be inspected without downloading a byte of geometry. That matters here: the 54 glTF files total 534 MB, of which one model is 429 MB.
+The short version, so this note is not left with a hole in it: glTF is nearly absent from Fuel -- 54 files among 2,333 models, three of them robots -- so there is no community practice for glTF robots to copy, and this project's specification is doing original work rather than following anyone. The Gazebo team's own demo assets are the nearest thing to a reference, and they disagree with several rules in `model-spec.md`.
 
-Your read is right. The sharper version is that glTF is nearly absent from Fuel, and entirely absent from the part of Fuel we would want to learn from.
-
-Excluding the 1,033 GoogleResearch scanned objects - shoes, bottles, toys, uniformly OBJ plus MTL plus JPEG, one mesh each - leaves 2,333 models with retrievable file trees:
-
-[cols="2*",options="header",frame=all,grid=all]
-|===
-| Contains | models
-
-| `.dae` | 1,404
-| `.obj` | 350
-| `.stl` | 300
-| `.gltf` or `.glb` | 54
-|===
-
-Narrowing to things that are robots in our sense - at least one `<sensor>` or an actuation/control plugin, which catches quadrotors whose only joints spin propellers and free-flyers with thrusters and no joints at all - gives 427 models. Three of them use glTF. By upload year there were none before 2024 and exactly one per year since, against 21 to 75 COLLADA platforms per year throughout. All 33 `<actor>` skins in the library are COLLADA.
-
-So there is no community practice for glTF robots to copy. There is no second opinion to check ours against. That is a finding rather than a dead end, since it removes "but everyone else does it this way" as an argument in either direction, but it does mean the spec is doing original work and should say so.
-
-The three that qualify:
-
-[cols="6*",options="header",frame=all,grid=all]
-|===
-| Model | Container | Links | Joints | Triangles | Note
-
-| `Open-RMF/Caddy` | `.gltf` + `.bin` | 11 | 8 | 7,714 | The only single-file-plus-`<submesh>` precedent in Fuel
-| `proque/atmos` | GLB | 9 | 0 | 195,403 | Thrusters, IMU, barometer, navsat; factor-only materials
-| `proque/atmos_dual` | GLB | 13 | 4 | 1,463,312 | Mixes one GLB with four DAE meshes; absolute versioned URL as the mesh URI
-|===
-
-`Open-RMF/Caddy` is worth reading in full, because it is the one model in Fuel that answers question 1 in section 3.5.1 above - does anything downstream ever need to select a sub-entity out of the file. It carries the whole vehicle in `polaris.gltf` and each link picks its own part out by node name:
-
-[source,xml]
-----
-<mesh>
-  <uri>model://Caddy/meshes/polaris.gltf</uri>
-  <submesh><name>Front_Wheel_Left</name><center>true</center></submesh>
-</mesh>
-----
-
-Eleven visuals, one URI, eleven `<submesh>` selections, `<center>true</center>` on every moving part so its geometry is recentered on its joint origin and `<center>false</center>` on the chassis. Three defects in it are as instructive as the pattern. The file declares an external `"uri": "Ranger_Diffuse.png"` that is not in the upload - fetching it returns 404 - so the only articulated glTF robot in Fuel renders untextured, which is a direct argument for self-contained GLB over `.gltf` plus loose files. Node names are duplicated between each parent transform node and its mesh child, so `Steering_Wheel` matches two nodes and `<submesh>` resolution is ambiguous. And a 0.0255 scale factor is baked into every node transform rather than into the mesh data.
-
-What the other 51 glTF files tell us, all of them props, scenes or test uploads. Seven of the 54 are byte-identical re-uploads of someone else's asset, so there are 47 distinct files.
-
-* _Container_: 53 GLB to 1 `.gltf` plus `.bin`, and the one non-GLB is the broken one.
-* _Tooling_: 50 of 54 from the Blender glTF exporter, versions 3.3 through 5.1. Two from Sketchfab, one from Unity. No pipeline diversity to learn from.
-* _Scope actually used_: zero animations, zero skins, zero cameras, across every file. Every primitive is mode 4. Exactly one primitive in the entire corpus carries `TANGENT`, which agrees with what `glb_probe` found about our own loader.
-* _Texture format_: 5,429 JPEG images against 95 PNG. Forty-four of the 54 carry normal maps and 37 carry packed metallic-roughness maps, overwhelmingly as JPEG. This contradicts decision 4 and REP-0158 head-on. It does not overturn either - a corpus of warehouse props is not evidence about correctness - but it does say that assets delivered to us by anyone working in the normal way will arrive with JPEG normal maps, so the spec needs to state the rule and the remedy rather than assume the toolchain produces PNG.
-* _The metalness default trap is live_: 128 materials across 9 models leave `metallicFactor` unset, so 1.0, with no metallic-roughness texture to override it. `dhyutin/trial` is 8 of 8; `proque/atmos` is 80 of 404. The same defect we found in four of fifteen delivered parts.
-* _Extensions_: `KHR_materials_specular` in 29 models, `KHR_materials_ior` in 13, `KHR_materials_transmission` in 9, `KHR_texture_transform` in 6, `KHR_materials_unlit` in 2. Five models put `KHR_texture_transform` in `extensionsRequired` rather than `extensionsUsed`, which a spec-compliant reader must refuse to load outright. Those five are a ready-made conformance probe for what Gazebo actually does - `OpenRobotics/Distribution_Warehouse` is the convenient one.
-
-The two assets worth keeping as reference material:
-
-* `OpenRobotics/Forklift` - the best-authored glTF asset in Fuel. Self-contained GLB, 15,492 triangles, embedded albedo, normal and packed metalness-roughness maps, and roughly 30 hand-placed primitive colliders in the SDF against the single visual mesh. That collision discipline is worth as much as the material work. Its normal map is JPEG.
-* `OpenRobotics/Ionic Mascot` - the factor-only case: 12 materials, no textures at all, explicit `metallicFactor: 0` on the non-metals. Also a counter-example on naming, with 148 nodes called `Cylinder002`, `Line001`, `Torus008`. Nothing in that file could be addressed by `<submesh>`.
-
-One caution about reading Fuel for SDF convention rather than for assets. Across the 427 robot platforms, 67% use primitive-only collision, 64% declare `<material>` in the SDF, 30% still reference the Gazebo Classic `gazebo.material` script, and only 8% use `<submesh>` at all - the dominant pattern is one mesh file per link, as in `bosdyn_spot` with 27 separate meshes. Of the 65 platforms declaring `<pbr>` in the SDF, every one pairs it with COLLADA and none with glTF. The two material approaches in the library are cleanly separated, and nobody does both, which is the one thing worth reconciling against the "PBR must be declared in the SDF" rule in our own `CLAUDE.md`.
-
-[discrete]
-====== Repos
-
-*Q:* What are  popular (can be measured via github analytics) projects using glTF assets in Gazebo?
 ****
 
 [[foreword]]
