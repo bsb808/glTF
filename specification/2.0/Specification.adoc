@@ -855,7 +855,7 @@ For property names, glTF usually uses camel case, `likeThis`.
 
 For our pipeline the consequences, verified against gz-common 7.3.0 and rviz_rendering 15.2.5 with hand-authored probe files: Gazebo performs no up-axis conversion at all and puts the file's axes straight onto the link's axes; RViz applies the +90° roll itself; the correction for Gazebo therefore lives in the SDF visual pose, and it cannot be the same value for both consumers. A part modeled x forward, y left, z up in Blender and exported with the default settings arrives with forward on +X, up on +Y and its right-hand side on +Z, which meets the up-axis sentence and not the front sentence. Whether to change that is review decision 2 in `bluerobotics_models`.
 
-The derivation, the loader source, the probe assets and a tutorial are in `tools/maritime-workspace/notes/glTF_Gazebo_ROS_Coordinates.md`.
+The conventions, the vocabulary and the reconciliation against ISO 9787 are in `tools/maritime-workspace/notes/glTF_Gazebo_ROS_Coordinates.md`. The loader source, the probe results and the three-consumer tutorial are in that note's abandoned first draft, in `maritime-workspace` git history at `ab5f6a6`; the probe assets themselves are live at `~/maritime_ws/spike/coords/`.
 ****
 
 
